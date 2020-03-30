@@ -21,6 +21,18 @@ const jira = axios.create({
   }
 });
 
+// Create worklog extractor function
+const getWorklog = worklogs => {
+  const cleanWorklog = [];
+  for (const worklog of worklogs) {
+    cleanWorklog.push({
+      name: worklog.author.name,
+      timeSpentSeconds: worklog.timeSpentSeconds
+    });
+  }
+  return cleanWorklog;
+};
+
 //@route POST api/jql
 //@ desc searches Diabolocom jira for tickets matching jql query
 // @access Private (Jira auth)
@@ -60,6 +72,9 @@ router.post(
       });
       console.log(response.data);
       res.status(200);
+
+      const cleanResponse = {};
+
       res.json(response.data);
       //res.send('jql route');
     } catch (err) {
