@@ -1,15 +1,23 @@
 const express = require('express');
 const router = express.Router();
 const { check, validationResult } = require('express-validator');
+const config = require('config');
+const jirausername = config.get('username');
+const jirapassword = config.get('password');
+const domain = config.get('domain');
 
 // instanciate jira request
 const axios = require('axios');
 const jira = axios.create({
-  baseURL: 'https://jira.diabolocom.com/rest/api/2',
+  baseURL: domain + '/rest/api/2',
   timeout: 2000,
+  auth: {
+    username: jirausername,
+    password: jirapassword
+  },
   headers: {
-    'Content-Type': 'application/json',
-    Authorization: 'Basic YmlhZnJhdGU6UkJsYW51aXRkZXN0ZW1wczc1Jg=='
+    'Content-Type': 'application/json'
+    //Authorization: 'Basic YmlhZnJhdGU6UkJsYW51aXRkZXN0ZW1wczc1Jg=='
   }
 });
 
@@ -28,7 +36,8 @@ router.post(
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
     }
-    console.log(req.body);
+    //console.log(req.body);
+    console.log(jirausername);
 
     try {
       const response = await jira.post('/search', {
