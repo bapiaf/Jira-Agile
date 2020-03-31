@@ -21,14 +21,43 @@ const jira = axios.create({
   }
 });
 
-// worklog extractor function
+//check if worklog author already present (used in worklog extractor)
+const checkAuthor = (author, cleanWorklog) => {
+  var check = false;
+  var indexMatch = -1;
+
+  if (cleanWorklog.length > 0) {
+    for (var i = 0; i < cleanWorklog.length; i++) {
+      if (cleanWorklog[i].name == author) {
+        check = true;
+        indexMatch += 1;
+      }
+    }
+  }
+  console.log(indexMatch);
+  return indexMatch;
+};
+
+// worklog extractor function (used in issue extractor)
 const getWorklog = worklogs => {
   const cleanWorklog = [];
   for (const worklog of worklogs) {
-    cleanWorklog.push({
-      name: worklog.author.name,
-      timeSpentSeconds: worklog.timeSpentSeconds
-    });
+    console.log(worklog.author.name);
+    console.log(cleanWorklog);
+    var index = checkAuthor(worklog.author.name, cleanWorklog);
+    console.log(index);
+    if (index == -1) {
+      cleanWorklog.push({
+        name: worklog.author.name,
+        timeSpentSeconds: worklog.timeSpentSeconds
+      });
+      console.log('new author');
+      console.log(cleanWorklog);
+    } else {
+      console.log('existing author');
+      cleanWorklog[index].timeSpentSeconds += worklog.timeSpentSeconds;
+      console.log(cleanWorklog);
+    }
   }
   return cleanWorklog;
 };
@@ -71,7 +100,7 @@ router.post(
       return res.status(400).json({ errors: errors.array() });
     }
     //console.log(req.body);
-    console.log(jirausername);
+    //console.log(jirausername);
 
     try {
       const response = await jira.post('/search', {
@@ -93,7 +122,7 @@ router.post(
           'worklog'
         ]
       });
-      console.log(response.data);
+      //console.log(response.data);
       res.status(200);
 
       const cleanResponse = getIssues(response.data.issues);

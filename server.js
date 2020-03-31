@@ -9,7 +9,7 @@ app.use(express.json({ extended: false }));
 
 // Define Routes
 app.use('/api/jql', require('./routes/api/jql'));
-app.use('/api/worklog', require('./routes/api/worklog'));
+app.use('/api/jql2', require('./routes/api/jql2'));
 
 const PORT = process.env.PORT || 5000;
 
