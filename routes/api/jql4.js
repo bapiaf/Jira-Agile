@@ -101,7 +101,7 @@ const getIssues = issues => {
       summary: issue.fields.summary,
       status: issue.fields.status.name,
       issuetype: issue.fields.issuetype.name,
-      affectsVersion: issue.fields.versions.name,
+      affectsVersion: issue.fields.versions[0].name,
       fixVersion: issue.fields.fixVersions,
       epicLink: issue.fields.customfield_10006,
       SP: issue.fields.customfield_10002,

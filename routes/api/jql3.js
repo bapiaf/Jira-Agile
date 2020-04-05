@@ -38,15 +38,10 @@ const jira = axios.create({
 const getQADev = worklogs => {
   var QAtime = 0;
   var Devtime = 0;
-  console.log('got QA team');
   for (const worklog of worklogs) {
     if (QAteam.includes(worklog.author.name) == true) {
-      console.log('member of QA team');
-      console.log(worklog.timeSpentSeconds);
       QAtime += worklog.timeSpentSeconds;
     } else {
-      console.log('member of Dev team');
-      console.log(worklog.timeSpentSeconds);
       Devtime += worklog.timeSpentSeconds;
     }
   }
@@ -85,6 +80,16 @@ const getWorklog = worklogs => {
   return cleanWorklog;
 };
 
+// version [] cleaner. Gets the last (most relevant) fix version or affect version
+// used in issue extractor (getIssues)
+const getVersion = version => {
+  var cleanVersion = '';
+  if (version.length > 0) {
+    cleanVersion = version[version.length - 1].name;
+  }
+  return cleanVersion;
+};
+
 // extract clean issues from Jira's response
 // used in the jql route
 const getIssues = issues => {
@@ -95,8 +100,8 @@ const getIssues = issues => {
       summary: issue.fields.summary,
       status: issue.fields.status.name,
       issuetype: issue.fields.issuetype.name,
-      affectsVersion: issue.fields.versions.name,
-      fixVersion: issue.fields.fixVersions,
+      affectsVersion: getVersion(issue.fields.versions),
+      fixVersion: getVersion(issue.fields.fixVersions),
       epicLink: issue.fields.customfield_10006,
       SP: issue.fields.customfield_10002,
       SP_FE: issue.fields.customfield_10700,
@@ -130,10 +135,9 @@ router.post(
 
     try {
       const response = await jira.post('/search', {
-        jql:
-          'project = EV2 AND status not in (Canceled) AND component = Data AND TargetVersion = 3.10',
+        jql: req.body.jql,
         startAt: 0,
-        maxResults: 20,
+        maxResults: 500,
         fields: [
           'summary',
           'issuetype',
