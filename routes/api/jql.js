@@ -90,9 +90,66 @@ const getVersion = version => {
   return cleanVersion;
 };
 
-// extract clean issues from Jira's response
+// extract list of parent epics from Jira's response to /search
+// used in the jql route to extract epics from the epic link custom field
+const getEpicLinks = issues => {
+  var epicsJQL = '';
+  for (const issue of issues) {
+    if (issue.fields.customfield_10006 != null) {
+      epicsJQL += issue.fields.customfield_10006.toString() + ',';
+    }
+  }
+  console.log(epicsJQL);
+  return epicsJQL.slice(0, epicsJQL.length - 1);
+};
+
+// extract clean (key,name) set of issues from Jira's response to /search
+// used in getEpics
+const getKeySummary = issues => {
+  const cleanIssues = [];
+  for (const issue of issues) {
+    cleanIssues.push({
+      key: issue.key,
+      summary: issue.fields.summary
+    });
+  }
+  return cleanIssues;
+};
+
+// get (key,summary) attributes from a set of issues using Jira /search/
+// used to translate the list of epic linls in an epic (key,name) table in jql route
+async function getIssueSummaries(issues) {
+  try {
+    console.log('issuekey in ' + issues);
+    const response = await jira.post('/search', {
+      jql: 'issuekey in (' + issues + ')',
+      startAt: 0,
+      maxResults: 500,
+      fields: ['summary']
+    });
+    console.log(response.data);
+    const cleanResponse = getKeySummary(response.data.issues);
+    console.log('got my epics linked key/summary array');
+    console.log(cleanResponse);
+    return cleanResponse;
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server error - get Issue Names');
+  }
+}
+
+const findIssueSummary = (issueKey, keySummaryArray) => {
+  for (const keySummary of keySummaryArray) {
+    if (keySummary.key == issueKey) {
+      return keySummary.summary;
+    }
+  }
+  console.log('found linked epic summary for' + issueKey);
+};
+
+// extract clean issues from Jira's response to /search
 // used in the jql route
-const getIssues = issues => {
+const getIssues = (issues, epicsLinkedSummaries) => {
   const cleanIssues = [];
   for (const issue of issues) {
     cleanIssues.push({
@@ -103,6 +160,10 @@ const getIssues = issues => {
       affectsVersion: getVersion(issue.fields.versions),
       fixVersion: getVersion(issue.fields.fixVersions),
       epicLink: issue.fields.customfield_10006,
+      epicSummary: findIssueSummary(
+        issue.fields.customfield_10006,
+        epicsLinkedSummaries
+      ),
       SP: issue.fields.customfield_10002,
       SP_FE: issue.fields.customfield_10700,
       SP_BE: issue.fields.customfield_10701,
@@ -155,11 +216,19 @@ router.post(
       //console.log(response.data);
       res.status(200);
 
-      const cleanResponse = getIssues(response.data.issues);
-      res.json(cleanResponse);
+      //extract list of linked epics for a jql query
+      const epicsLinked = getEpicLinks(response.data.issues);
+      console.log(epicsLinked);
+      // obtain array of {key:, name:} of all linked epics
+      const epicsLinkedSummaries = await getIssueSummaries(epicsLinked);
+      console.log('will prepare response');
+      console.log(epicsLinkedSummaries);
 
-      //res.json(response.data);
-      //res.send('jql route');
+      const cleanResponse = getIssues(
+        response.data.issues,
+        epicsLinkedSummaries
+      );
+      res.json(cleanResponse);
     } catch (err) {
       console.error(err.message);
       res.status(500).send('Server error - Jira search issues with JQL');

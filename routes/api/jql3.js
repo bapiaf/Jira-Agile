@@ -157,9 +157,6 @@ router.post(
 
       const cleanResponse = getIssues(response.data.issues);
       res.json(cleanResponse);
-
-      //res.json(response.data);
-      //res.send('jql route');
     } catch (err) {
       console.error(err.message);
       res.status(500).send('Server error - Jira search issues with JQL');
