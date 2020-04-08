@@ -33,7 +33,7 @@ const jira = axios.create({
   }
 });
 
-// Extract QA & Dev time from a worklog
+// Extract QA & Dev time from the issue's worklog
 // used in issue extractor (getIssues)
 const getQADev = worklogs => {
   var QAtime = 0;
@@ -48,7 +48,7 @@ const getQADev = worklogs => {
   return [QAtime, Devtime];
 };
 
-//check if worklog author already present
+//check if the author of a new worklog is already present in the consolidated worklog
 //used in worklog extractor (getWorklog)
 const checkAuthor = (author, cleanWorklog) => {
   var indexMatch = -1;
@@ -80,7 +80,7 @@ const getWorklog = worklogs => {
   return cleanWorklog;
 };
 
-// version [] cleaner. Gets the last (most relevant) fix version or affect version
+// version [] cleaner. Gets the last (most relevant) fix version or affected version
 // used in issue extractor (getIssues)
 const getVersion = version => {
   var cleanVersion = '';
@@ -90,8 +90,8 @@ const getVersion = version => {
   return cleanVersion;
 };
 
-// extract list of parent epics from Jira's response to /search
-// used in the jql route to extract epics from the epic link custom field
+// extracts a list of linked (parent) epics from a set of issues (e.g. from Jira's response to /search)
+// used in the jql route to extract linked epics using the epic link custom field
 const getEpicLinks = issues => {
   var epicsJQL = '';
   for (const issue of issues) {
@@ -103,8 +103,8 @@ const getEpicLinks = issues => {
   return epicsJQL.slice(0, epicsJQL.length - 1);
 };
 
-// extract clean (key,name) set of issues from Jira's response to /search
-// used in getEpics
+// extract clean array of issues in the {key:,summary:} format from Jira's response to /search
+// used in getIssueSummaries
 const getKeySummary = issues => {
   const cleanIssues = [];
   for (const issue of issues) {
@@ -117,38 +117,40 @@ const getKeySummary = issues => {
 };
 
 // get (key,summary) attributes from a set of issues using Jira /search/
-// used to translate the list of epic linls in an epic (key,name) table in jql route
+// used in jql route to transform the list of epic links (keys) in an array of epics in the {key:,summary:} format
 async function getIssueSummaries(issues) {
   try {
-    console.log('issuekey in ' + issues);
+    //console.log('issuekey in ' + issues);
     const response = await jira.post('/search', {
       jql: 'issuekey in (' + issues + ')',
       startAt: 0,
       maxResults: 500,
       fields: ['summary']
     });
-    console.log(response.data);
+    //console.log(response.data);
     const cleanResponse = getKeySummary(response.data.issues);
-    console.log('got my epics linked key/summary array');
-    console.log(cleanResponse);
+    //console.log('got my epics linked key/summary array');
+    //console.log(cleanResponse);
     return cleanResponse;
   } catch (err) {
-    console.error(err.message);
+    //console.error(err.message);
     res.status(500).send('Server error - get Issue Names');
   }
 }
 
+// finds the summary of an issue using the issue key, in an array of issues in the {key:,summary:} format
 const findIssueSummary = (issueKey, keySummaryArray) => {
   for (const keySummary of keySummaryArray) {
     if (keySummary.key == issueKey) {
+      console.log('found linked epic summary for' + issueKey);
       return keySummary.summary;
     }
   }
-  console.log('found linked epic summary for' + issueKey);
+  return '';
 };
 
-// extract clean issues from Jira's response to /search
-// used in the jql route
+// extracts a clean, BI-ready set of issues from Jira's response to /search
+// used in the jql route to prepare the response body
 const getIssues = (issues, epicsLinkedSummaries) => {
   const cleanIssues = [];
   for (const issue of issues) {
@@ -178,6 +180,7 @@ const getIssues = (issues, epicsLinkedSummaries) => {
 
 //@route POST api/jql
 //@ desc searches Diabolocom jira for tickets matching jql query
+// & returns a clean and BI-ready set of issues
 // @access Public. (Server is using Jira auth from config)
 router.post(
   '/',

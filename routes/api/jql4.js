@@ -5,6 +5,18 @@ const config = require('config');
 const jirausername = config.get('username');
 const jirapassword = config.get('password');
 const domain = config.get('domain');
+// get QA members
+const QAteam = [
+  'aozherelyeva',
+  'cbalan',
+  'dmarkov',
+  'dradu',
+  'ebrysova',
+  'ilisovskaya',
+  'sartamonov',
+  'vrodina',
+  'yhoptyan',
+];
 
 // instanciate jira request
 const axios = require('axios');
@@ -13,53 +25,30 @@ const jira = axios.create({
   timeout: 2000,
   auth: {
     username: jirausername,
-    password: jirapassword
+    password: jirapassword,
   },
   headers: {
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
     //Authorization: 'Basic YmlhZnJhdGU6UkJsYW51aXRkZXN0ZW1wczc1Jg=='
-  }
+  },
 });
 
-// get QA members
-async function getQA() {
-  try {
-    const response = await jira.get(
-      '/group/member?groupname=qa&includeInactiveUsers=true'
-    );
-    var QAteam = [];
-    for (const value of response.data.values) {
-      QAteam.push(value.name);
-    }
-    console.log(QAteam);
-    return QAteam;
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server error - QA member request to Jira');
-  }
-}
-
-// Extract QA & Dev time from a worklog
+// Extract QA & Dev time from the issue's worklog
 // used in issue extractor (getIssues)
-const getQADev = (worklogs, QAteam) => {
+const getQADev = (worklogs) => {
   var QAtime = 0;
   var Devtime = 0;
-  console.log('got QA team');
   for (const worklog of worklogs) {
     if (QAteam.includes(worklog.author.name) == true) {
-      console.log('member of QA team');
-      console.log(worklog.timeSpentSeconds);
-      QAtime += worklog.timeSpentSeconds;
+      QAtime += worklog.timeSpentSeconds / 3600;
     } else {
-      console.log('member of Dev team');
-      console.log(worklog.timeSpentSeconds);
-      Devtime += worklog.timeSpentSeconds;
+      Devtime += worklog.timeSpentSeconds / 3600;
     }
   }
   return [QAtime, Devtime];
 };
 
-//check if worklog author already present
+//check if the author of a new worklog is already present in the consolidated worklog
 //used in worklog extractor (getWorklog)
 const checkAuthor = (author, cleanWorklog) => {
   var indexMatch = -1;
@@ -75,25 +64,94 @@ const checkAuthor = (author, cleanWorklog) => {
 
 // Extract clean worklogs from a Jira raw worklog and agregate them by author
 // used in issue extractor (getIssues)
-const getWorklog = worklogs => {
+const getWorklog = (worklogs) => {
   var cleanWorklog = [];
   for (const worklog of worklogs) {
     var index = checkAuthor(worklog.author.name, cleanWorklog);
     if (index == -1) {
       cleanWorklog.push({
         name: worklog.author.name,
-        timeSpentSeconds: worklog.timeSpentSeconds
+        timeSpentHours: worklog.timeSpentSeconds / 3600,
       });
     } else {
-      cleanWorklog[index].timeSpentSeconds += worklog.timeSpentSeconds;
+      cleanWorklog[index].timeSpentHours += worklog.timeSpentSeconds / 3600;
     }
   }
   return cleanWorklog;
 };
 
-// extract clean issues from Jira's response
-// used in the jql route
-const getIssues = issues => {
+// version [] cleaner. Gets the last (most relevant) fix version or affected version
+// used in issue extractor (getIssues)
+const getVersion = (version) => {
+  var cleanVersion = '';
+  if (version.length > 0) {
+    cleanVersion = version[version.length - 1].name;
+  }
+  return cleanVersion;
+};
+
+// extracts a list of linked (parent) epics from a set of issues (e.g. from Jira's response to /search)
+// used in the jql route to extract linked epics using the epic link custom field
+const getEpicLinks = (issues) => {
+  var epicsJQL = '';
+  for (const issue of issues) {
+    if (issue.fields.customfield_10006 != null) {
+      epicsJQL += issue.fields.customfield_10006.toString() + ',';
+    }
+  }
+  console.log(epicsJQL);
+  return epicsJQL.slice(0, epicsJQL.length - 1);
+};
+
+// extract clean array of issues in the {key:,summary:} format from Jira's response to /search
+// used in getIssueSummaries
+const getKeySummary = (issues) => {
+  const cleanIssues = [];
+  for (const issue of issues) {
+    cleanIssues.push({
+      key: issue.key,
+      summary: issue.fields.summary,
+    });
+  }
+  return cleanIssues;
+};
+
+// get (key,summary) attributes from a set of issues using Jira /search/
+// used in jql route to transform the list of epic links (keys) in an array of epics in the {key:,summary:} format
+async function getIssueSummaries(issues) {
+  try {
+    //console.log('issuekey in ' + issues);
+    const response = await jira.post('/search', {
+      jql: 'issuekey in (' + issues + ')',
+      startAt: 0,
+      maxResults: 500,
+      fields: ['summary'],
+    });
+    //console.log(response.data);
+    const cleanResponse = getKeySummary(response.data.issues);
+    //console.log('got my epics linked key/summary array');
+    //console.log(cleanResponse);
+    return cleanResponse;
+  } catch (err) {
+    //console.error(err.message);
+    res.status(500).send('Server error - get Issue Names');
+  }
+}
+
+// finds the summary of an issue using the issue key, in an array of issues in the {key:,summary:} format
+const findIssueSummary = (issueKey, keySummaryArray) => {
+  for (const keySummary of keySummaryArray) {
+    if (keySummary.key == issueKey) {
+      console.log('found linked epic summary for' + issueKey);
+      return keySummary.summary;
+    }
+  }
+  return '';
+};
+
+// extracts a clean, BI-ready set of issues from Jira's response to /search
+// used in the jql route to prepare the response body
+const getIssues = (issues, epicsLinkedSummaries) => {
   const cleanIssues = [];
   for (const issue of issues) {
     cleanIssues.push({
@@ -101,16 +159,27 @@ const getIssues = issues => {
       summary: issue.fields.summary,
       status: issue.fields.status.name,
       issuetype: issue.fields.issuetype.name,
-      affectsVersion: issue.fields.versions[0].name,
-      fixVersion: issue.fields.fixVersions,
+      created:
+        issue.fields.created.slice(0, 4) +
+        '/' +
+        issue.fields.created.slice(5, 7) +
+        '/' +
+        issue.fields.created.slice(8, 10),
+      //reporter: issue.fields.reporter.name,
+      affectsVersion: getVersion(issue.fields.versions),
+      fixVersion: getVersion(issue.fields.fixVersions),
       epicLink: issue.fields.customfield_10006,
+      epicSummary: findIssueSummary(
+        issue.fields.customfield_10006,
+        epicsLinkedSummaries
+      ),
       SP: issue.fields.customfield_10002,
       SP_FE: issue.fields.customfield_10700,
       SP_BE: issue.fields.customfield_10701,
       components: issue.fields.components.name,
       worklog: getWorklog(issue.fields.worklog.worklogs),
       qatime: getQADev(issue.fields.worklog.worklogs)[0],
-      devtime: getQADev(issue.fields.worklog.worklogs)[1]
+      devtime: getQADev(issue.fields.worklog.worklogs)[1],
     });
   }
   return cleanIssues;
@@ -118,14 +187,11 @@ const getIssues = issues => {
 
 //@route POST api/jql
 //@ desc searches Diabolocom jira for tickets matching jql query
+// & returns a clean and BI-ready set of issues
 // @access Public. (Server is using Jira auth from config)
 router.post(
   '/',
-  [
-    check('jql', 'JQL is required')
-      .not()
-      .isEmpty()
-  ],
+  [check('jql', 'JQL is required').not().isEmpty()],
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -136,14 +202,15 @@ router.post(
 
     try {
       const response = await jira.post('/search', {
-        jql:
-          'project = EV2 AND status not in (Canceled) AND component = Data AND TargetVersion = 3.10',
+        jql: req.body.jql,
         startAt: 0,
-        maxResults: 20,
+        maxResults: 500,
         fields: [
           'summary',
           'issuetype',
           'status',
+          'created',
+          'reporter',
           'fixVersions',
           'versions',
           'components',
@@ -151,17 +218,25 @@ router.post(
           'customfield_10700',
           'customfield_10701',
           'customfield_10002',
-          'worklog'
-        ]
+          'worklog',
+        ],
       });
       //console.log(response.data);
       res.status(200);
 
-      const cleanResponse = getIssues(response.data.issues);
-      res.json(cleanResponse);
+      //extract list of linked epics for a jql query
+      const epicsLinked = getEpicLinks(response.data.issues);
+      console.log(epicsLinked);
+      // obtain array of {key:, name:} of all linked epics
+      const epicsLinkedSummaries = await getIssueSummaries(epicsLinked);
+      console.log('will prepare response');
+      console.log(epicsLinkedSummaries);
 
-      //res.json(response.data);
-      //res.send('jql route');
+      const cleanResponse = getIssues(
+        response.data.issues,
+        epicsLinkedSummaries
+      );
+      res.json(cleanResponse);
     } catch (err) {
       console.error(err.message);
       res.status(500).send('Server error - Jira search issues with JQL');

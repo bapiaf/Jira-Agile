@@ -25,9 +25,6 @@ const jira = axios.create({
 //@ desc gets Diabolocom QA members
 // @access Public. (Server is using Jira auth from config)
 router.get('/', async (req, res) => {
-  //console.log(req.body);
-  //console.log(jirausername);
-
   try {
     const response = await jira.get(
       '/group/member?groupname=qa&includeInactiveUsers=true'
