@@ -1,3 +1,24 @@
+//ROUTE CURRENTLY IN USE ON GOOGLE SHEET "RELEASE SCORECARDS"
+//Returns Jira tickets associated to a JQL query with the attributes
+// key:
+//summary:
+//status:
+//issuetype:
+//created:
+//reporter:
+//affectsVersion:
+//fixVersion:
+//epicLink:
+//epicSummary:
+//SP:
+//SP_FE:
+//SP_BE:
+//qatime:
+//devtime
+//priority
+//worklog
+//components:
+
 const express = require('express');
 const router = express.Router();
 const { check, validationResult } = require('express-validator');
@@ -78,6 +99,17 @@ const getWorklog = (worklogs) => {
     }
   }
   return cleanWorklog;
+};
+
+// Extracts clean array of component names from a Jira raw component set
+// used in issue extractor (getIssues)
+const getComponents = (components) => {
+  var cleanComponents = '';
+  for (const component of components) {
+    cleanComponents += component.name;
+    cleanComponents += ' ';
+  }
+  return cleanComponents;
 };
 
 // version [] cleaner. Gets the last (most relevant) fix version or affected version
@@ -176,7 +208,8 @@ const getIssues = (issues, epicsLinkedSummaries) => {
       SP: issue.fields.customfield_10002,
       SP_FE: issue.fields.customfield_10700,
       SP_BE: issue.fields.customfield_10701,
-      components: issue.fields.components.name,
+      priority: issue.fields.priority.name,
+      components: getComponents(issue.fields.components),
       worklog: getWorklog(issue.fields.worklog.worklogs),
       qatime: getQADev(issue.fields.worklog.worklogs)[0],
       devtime: getQADev(issue.fields.worklog.worklogs)[1],
@@ -214,6 +247,7 @@ router.post(
           'fixVersions',
           'versions',
           'components',
+          'priority',
           'customfield_10006',
           'customfield_10700',
           'customfield_10701',
