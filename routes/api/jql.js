@@ -25,18 +25,7 @@ const config = require('config');
 const jirausername = config.get('username');
 const jirapassword = config.get('password');
 const domain = config.get('domain');
-// get QA members
-const QAteam = [
-  'aozherelyeva',
-  'cbalan',
-  'dmarkov',
-  'dradu',
-  'ebrysova',
-  'ilisovskaya',
-  'sartamonov',
-  'vrodina',
-  'yhoptyan',
-];
+const QAteam = config.get('QAteam');
 
 // instanciate jira request
 const axios = require('axios');
@@ -49,7 +38,6 @@ const jira = axios.create({
   },
   headers: {
     'Content-Type': 'application/json',
-    //Authorization: 'Basic YmlhZnJhdGU6UkJsYW51aXRkZXN0ZW1wczc1Jg=='
   },
 });
 

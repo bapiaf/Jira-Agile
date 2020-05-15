@@ -26,31 +26,19 @@ const config = require('config');
 const jirausername = config.get('username');
 const jirapassword = config.get('password');
 const domain = config.get('domain');
-// get QA members
-const QAteam = [
-  'aozherelyeva',
-  'cbalan',
-  'dmarkov',
-  'dradu',
-  'ebrysova',
-  'ilisovskaya',
-  'sartamonov',
-  'vrodina',
-  'yhoptyan',
-];
+const QAteam = config.get('QAteam');
 
 // instanciate jira request
 const axios = require('axios');
 const jira = axios.create({
   baseURL: domain + '/rest/api/2',
-  timeout: 2000,
+  timeout: 6000,
   auth: {
     username: jirausername,
     password: jirapassword,
   },
   headers: {
     'Content-Type': 'application/json',
-    //Authorization: 'Basic YmlhZnJhdGU6UkJsYW51aXRkZXN0ZW1wczc1Jg=='
   },
 });
 
@@ -76,7 +64,7 @@ const checkAuthor = (author, cleanWorklog) => {
   if (cleanWorklog.length > 0) {
     for (var i = 0; i < cleanWorklog.length; i++) {
       if (cleanWorklog[i].name == author) {
-        indexMatch += 1;
+        indexMatch = i;
       }
     }
   }
@@ -131,7 +119,7 @@ const getEpicLinks = (issues) => {
       epicsJQL += issue.fields.customfield_10006.toString() + ',';
     }
   }
-  console.log(epicsJQL);
+  //console.log(epicsJQL);
   return epicsJQL.slice(0, epicsJQL.length - 1);
 };
 
@@ -156,7 +144,7 @@ async function getIssueSummaries(issues) {
     const response = await jira.post('/search', {
       jql: 'issuekey in (' + issues + ')',
       startAt: 0,
-      maxResults: 500,
+      maxResults: 700,
       fields: ['summary'],
     });
     //console.log(response.data);
@@ -174,7 +162,7 @@ async function getIssueSummaries(issues) {
 const findIssueSummary = (issueKey, keySummaryArray) => {
   for (const keySummary of keySummaryArray) {
     if (keySummary.key == issueKey) {
-      console.log('found linked epic summary for' + issueKey);
+      //console.log('found linked epic summary for' + issueKey);
       return keySummary.summary;
     }
   }
@@ -237,7 +225,7 @@ router.post(
       const response = await jira.post('/search', {
         jql: req.body.jql,
         startAt: 0,
-        maxResults: 500,
+        maxResults: 700,
         fields: [
           'summary',
           'issuetype',
@@ -260,11 +248,11 @@ router.post(
 
       //extract list of linked epics for a jql query
       const epicsLinked = getEpicLinks(response.data.issues);
-      console.log(epicsLinked);
+      //console.log(epicsLinked);
       // obtain array of {key:, name:} of all linked epics
       const epicsLinkedSummaries = await getIssueSummaries(epicsLinked);
-      console.log('will prepare response');
-      console.log(epicsLinkedSummaries);
+      //console.log('will prepare response');
+      //console.log(epicsLinkedSummaries);
 
       const cleanResponse = getIssues(
         response.data.issues,
@@ -272,6 +260,8 @@ router.post(
       );
       res.json(cleanResponse);
     } catch (err) {
+      console.log('Damn');
+      console.log(err);
       console.error(err.message);
       res.status(500).send('Server error - Jira search issues with JQL');
     }
