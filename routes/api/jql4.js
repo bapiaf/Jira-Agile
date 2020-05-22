@@ -153,8 +153,8 @@ async function getIssueSummaries(issues) {
     //console.log(cleanResponse);
     return cleanResponse;
   } catch (err) {
-    //console.error(err.message);
-    res.status(500).send('Server error - get Issue Names');
+    console.error(err.message);
+    //res.status(500).send('Server error - get Issue Names');
   }
 }
 
