@@ -1,4 +1,3 @@
-//ROUTE CURRENTLY IN USE ON GOOGLE SHEET "RELEASE SCORECARDS"
 //Returns Jira tickets associated to a JQL query with the attributes
 // key:
 //summary:
@@ -6,6 +5,7 @@
 //issuetype:
 //created:
 //reporter:
+//targetVersion:
 //affectsVersion:
 //fixVersion:
 //epicLink:
@@ -144,7 +144,7 @@ async function getIssueSummaries(issues) {
     const response = await jira.post('/search', {
       jql: 'issuekey in (' + issues + ')',
       startAt: 0,
-      maxResults: 700,
+      maxResults: 2000,
       fields: ['summary'],
     });
     //console.log(response.data);
@@ -185,7 +185,14 @@ const getIssues = (issues, epicsLinkedSummaries) => {
         issue.fields.created.slice(5, 7) +
         '/' +
         issue.fields.created.slice(8, 10),
+      updated:
+        issue.fields.updated.slice(0, 4) +
+        '/' +
+        issue.fields.updated.slice(5, 7) +
+        '/' +
+        issue.fields.updated.slice(8, 10),
       //reporter: issue.fields.reporter.name,
+      targetVersion: issue.fields.customfield_10802[0],
       affectsVersion: getVersion(issue.fields.versions),
       fixVersion: getVersion(issue.fields.fixVersions),
       epicLink: issue.fields.customfield_10006,
@@ -225,12 +232,13 @@ router.post(
       const response = await jira.post('/search', {
         jql: req.body.jql,
         startAt: 0,
-        maxResults: 700,
+        maxResults: 2000,
         fields: [
           'summary',
           'issuetype',
           'status',
           'created',
+          'updated',
           'reporter',
           'fixVersions',
           'versions',
@@ -240,6 +248,7 @@ router.post(
           'customfield_10700',
           'customfield_10701',
           'customfield_10002',
+          'customfield_10802',
           'worklog',
         ],
       });

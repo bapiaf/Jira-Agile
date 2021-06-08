@@ -6,6 +6,7 @@
 //issuetype:
 //created:
 //reporter:
+//targetVersion:
 //affectsVersion:
 //fixVersion:
 //epicLink:
@@ -107,6 +108,7 @@ const getIssues = (issues) => {
       summary: issue.fields.summary,
       status: issue.fields.status.name,
       issuetype: issue.fields.issuetype.name,
+      targetVersion: issue.fields.customfield_10802[0],
       affectsVersion: getVersion(issue.fields.versions),
       fixVersion: getVersion(issue.fields.fixVersions),
       epicLink: issue.fields.customfield_10006,
@@ -151,6 +153,7 @@ router.post(
           'customfield_10700',
           'customfield_10701',
           'customfield_10002',
+          'customfield_10802',
           'worklog',
         ],
       });
