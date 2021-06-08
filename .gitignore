@@ -1,5 +1,3 @@
 node_modules/
 config/
-routes/api/jql.js
-routes/api/jql2.js
-routes/api/jql3.js
+routes/api/old/
